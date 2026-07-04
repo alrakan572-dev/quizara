@@ -1,4 +1,4 @@
-import { getQuestions } from "./questionService";
+import { getQuestions } from "../src/services/questionService";
 
 export async function testQuestions() {
   const result = await getQuestions();

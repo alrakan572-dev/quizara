@@ -7,7 +7,7 @@ import {
   type GameQuestion,
 } from "../game/GameEngine";
 import { DEFAULT_QUESTION_TIME } from "../game/Timer";
-import { saveUserAnswer } from "../services/answerService";
+import { saveUserAnswer } from "../services/AnswerService";
 import { addUserPoints } from "../services/userService";
 import { emitGameEvent } from "../core/EventEngine";
 

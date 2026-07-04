@@ -1,5 +1,5 @@
 import { getQuestions } from "../services/questionService";
-import { getAnsweredQuestionIds } from "../services/answerService";
+import { getAnsweredQuestionIds } from "../services/AnswerService";
 
 export async function selectQuestions(
   limit = 10,
