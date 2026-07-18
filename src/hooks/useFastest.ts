@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../auth";
 import { FastestEngine } from "../core/FastestEngine";
 
-export function useFastest(
-  telegramId = 123456789,
-  language = "en"
-) {
+export function useFastest(language = "en") {
+  const { user } = useAuth();
+  const telegramId = user?.telegram_id ?? null;
   const [question, setQuestion] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [answering, setAnswering] = useState(false);
@@ -23,27 +23,28 @@ export function useFastest(
   }
 
   useEffect(() => {
-    loadQuestion();
+    void loadQuestion();
   }, [language]);
 
   async function submitAnswer(selectedAnswer: string) {
-    if (!question || answering) return null;
+    if (!telegramId || !question || answering) return null;
 
     setAnswering(true);
 
-    const answerTimeMs = Date.now() - startTime;
+    try {
+      const answerTimeMs = Date.now() - startTime;
+      const answerResult = await FastestEngine.submitAnswer(
+        telegramId,
+        question,
+        selectedAnswer,
+        answerTimeMs,
+      );
 
-    const answerResult = await FastestEngine.submitAnswer(
-      telegramId,
-      question,
-      selectedAnswer,
-      answerTimeMs
-    );
-
-    setResult(answerResult);
-    setAnswering(false);
-
-    return answerResult;
+      setResult(answerResult);
+      return answerResult;
+    } finally {
+      setAnswering(false);
+    }
   }
 
   return {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../auth";
 import {
   loadWeeklyChallenges,
   initializeWeeklyChallenge,
@@ -6,35 +7,52 @@ import {
   claimWeeklyChallengeReward,
 } from "../services/WeeklyChallengeService";
 
-export function useWeeklyChallenge(
-  telegramId = 123456789,
-  language = "en"
-) {
+export function useWeeklyChallenge(language = "en") {
+  const { user } = useAuth();
+  const telegramId = user?.telegram_id ?? null;
   const [challenge, setChallenge] = useState<any>(null);
   const [userChallenge, setUserChallenge] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const challenges = await loadWeeklyChallenges(language);
+    let active = true;
 
+    async function load() {
+      if (!telegramId) {
+        if (active) {
+          setChallenge(null);
+          setUserChallenge(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+      const challenges = await loadWeeklyChallenges(language);
       const activeChallenge = challenges[0] ?? null;
 
+      if (!active) return;
       setChallenge(activeChallenge);
 
       if (activeChallenge) {
         const progress = await initializeWeeklyChallenge(
           telegramId,
-          activeChallenge.id
+          activeChallenge.id,
         );
 
+        if (!active) return;
         setUserChallenge(progress);
+      } else {
+        setUserChallenge(null);
       }
 
       setLoading(false);
     }
 
-    load();
+    void load();
+    return () => {
+      active = false;
+    };
   }, [telegramId, language]);
 
   async function addProgress(amount = 1) {
@@ -43,7 +61,7 @@ export function useWeeklyChallenge(
     const result = await updateWeeklyChallengeProgress(
       userChallenge,
       challenge,
-      amount
+      amount,
     );
 
     setUserChallenge({
@@ -56,12 +74,12 @@ export function useWeeklyChallenge(
   }
 
   async function claimReward() {
-    if (!challenge || !userChallenge) return false;
+    if (!telegramId || !challenge || !userChallenge) return false;
 
     const success = await claimWeeklyChallengeReward(
       telegramId,
       userChallenge,
-      challenge
+      challenge,
     );
 
     if (success) {

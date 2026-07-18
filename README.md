@@ -1,11 +1,18 @@
+# Package 3 — Part 1
 
-  # Quizora Telegram Mini App
+Quizara Home Dashboard & Smart Refresh Production
 
-  This is a code bundle for Quizora Telegram Mini App. The original project is available at https://www.figma.com/design/ZDZD624iZzkx3LEdWkUf3O/Quizora-Telegram-Mini-App.
+Included:
 
-  ## Running the code
+- production `get-home-data`
+- typed `HomeAPI`
+- shared `HomeDataProvider`
+- smart refresh event system
+- duplicate-request protection
+- visibility/focus refresh
+- loading/error boundary
+- dashboard adapter hook
+- deployment script
+- integration guide
 
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
+No mock data is included.

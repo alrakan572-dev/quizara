@@ -1,30 +1,54 @@
 import { useEffect, useState } from "react";
-import { getQuestions } from "../services/questionService";
+import { useAuth } from "../auth";
+import { QuestionEngine } from "../core/QuestionEngine";
 
-export function useQuestions() {
-  const [questions, setQuestions] = useState<any[]>([]);
+export function useQuestions(language = "en") {
+  const { user } = useAuth();
+  const telegramId = user?.telegram_id ?? null;
+  const [question, setQuestion] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
+  const [answering, setAnswering] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  async function loadQuestion() {
+    setLoading(true);
+    setResult(null);
+
+    const data = await QuestionEngine.loadQuestion(language);
+
+    setQuestion(data);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    async function loadQuestions() {
-      const { data, error } = await getQuestions();
+    void loadQuestion();
+  }, [language]);
 
-      if (error) {
-        setError(error);
-      } else {
-        setQuestions(data || []);
-      }
+  async function submitAnswer(selectedAnswer: string) {
+    if (!telegramId || !question || answering) return null;
 
-      setLoading(false);
+    setAnswering(true);
+
+    try {
+      const answerResult = await QuestionEngine.submitAnswer(
+        telegramId,
+        question,
+        selectedAnswer,
+      );
+
+      setResult(answerResult);
+      return answerResult;
+    } finally {
+      setAnswering(false);
     }
-
-    loadQuestions();
-  }, []);
+  }
 
   return {
-    questions,
+    question,
     loading,
-    error,
+    answering,
+    result,
+    loadQuestion,
+    submitAnswer,
   };
 }

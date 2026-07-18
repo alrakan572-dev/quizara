@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../auth";
 import { FindDifferenceEngine } from "../core/FindDifferenceEngine";
 
-export function useFindDifference(
-  telegramId = 123456789,
-  language = "en"
-) {
+export function useFindDifference(language = "en") {
+  const { user } = useAuth();
+  const telegramId = user?.telegram_id ?? null;
   const [image, setImage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [finishing, setFinishing] = useState(false);
@@ -25,31 +25,32 @@ export function useFindDifference(
   }
 
   useEffect(() => {
-    loadImage();
+    void loadImage();
   }, [language]);
 
   function addFoundDifference() {
-    setFoundCount((prev) => prev + 1);
+    setFoundCount((previous) => previous + 1);
   }
 
   async function finishGame() {
-    if (!image || finishing) return null;
+    if (!telegramId || !image || finishing) return null;
 
     setFinishing(true);
 
-    const answerTimeMs = Date.now() - startTime;
+    try {
+      const answerTimeMs = Date.now() - startTime;
+      const finishResult = await FindDifferenceEngine.finishGame(
+        telegramId,
+        image,
+        foundCount,
+        answerTimeMs,
+      );
 
-    const finishResult = await FindDifferenceEngine.finishGame(
-      telegramId,
-      image,
-      foundCount,
-      answerTimeMs
-    );
-
-    setResult(finishResult);
-    setFinishing(false);
-
-    return finishResult;
+      setResult(finishResult);
+      return finishResult;
+    } finally {
+      setFinishing(false);
+    }
   }
 
   return {

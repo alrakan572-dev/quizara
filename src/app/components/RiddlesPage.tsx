@@ -1,515 +1,479 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Clock, Zap, CheckCircle2, XCircle, ChevronRight, Trophy, Star } from "lucide-react";
+import {
+  ArrowLeft,
+  Brain,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Send,
+  Star,
+  XCircle,
+} from "lucide-react";
 
-const RIDDLES = [
-  {
-    id: 1,
-    question: "I speak without a mouth and hear without ears. I have no body, but I come alive with the wind. What am I?",
-    answers: ["A shadow", "An echo", "A dream", "A mirror"],
-    correct: 1,
-    points: 150,
-    difficulty: "MEDIUM",
-  },
-  {
-    id: 2,
-    question: "The more you take, the more you leave behind. What am I?",
-    answers: ["Time", "Money", "Footsteps", "Memories"],
-    correct: 2,
-    points: 100,
-    difficulty: "EASY",
-  },
-  {
-    id: 3,
-    question: "I have cities, but no houses live there. I have mountains, but no trees grow. I have water, but no fish swim. I have roads, but no cars drive. What am I?",
-    answers: ["A painting", "A map", "A dream", "A globe"],
-    correct: 1,
-    points: 200,
-    difficulty: "HARD",
-  },
-  {
-    id: 4,
-    question: "What has hands but can't clap?",
-    answers: ["A statue", "A robot", "A clock", "A puppet"],
-    correct: 2,
-    points: 100,
-    difficulty: "EASY",
-  },
-  {
-    id: 5,
-    question: "I'm light as a feather, but even the world's strongest man can't hold me for more than a few minutes. What am I?",
-    answers: ["A secret", "Breath", "A thought", "Sunlight"],
-    correct: 1,
-    points: 150,
-    difficulty: "MEDIUM",
-  },
-  {
-    id: 6,
-    question: "The more you have of it, the less you see. What is it?",
-    answers: ["Money", "Friends", "Darkness", "Knowledge"],
-    correct: 2,
-    points: 150,
-    difficulty: "MEDIUM",
-  },
-  {
-    id: 7,
-    question: "I have a tail and a head, but no body. What am I?",
-    answers: ["A coin", "A comet", "A snake", "A meteor"],
-    correct: 0,
-    points: 200,
-    difficulty: "HARD",
-  },
-  {
-    id: 8,
-    question: "What comes once in a minute, twice in a moment, but never in a thousand years?",
-    answers: ["Luck", "The letter M", "A wish", "A second"],
-    correct: 1,
-    points: 250,
-    difficulty: "HARD",
-  },
-];
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  EASY: "#10B981",
-  MEDIUM: "#FBBF24",
-  HARD: "#EF4444",
-};
-
-const TIMER_TOTAL = 20;
+import type { AppLanguage } from "../../api";
+import { useGame } from "../../hooks/useGame";
 
 interface RiddlesPageProps {
   onBack: () => void;
   userPoints: number;
-  onPointsUpdate: (pts: number) => void;
+  onPointsUpdate: (points: number) => void;
+  language?: AppLanguage;
 }
 
-type AnswerState = "idle" | "correct" | "wrong";
+export function RiddlesPage({
+  onBack,
+  userPoints,
+  onPointsUpdate,
+  language = "en",
+}: RiddlesPageProps) {
+  const {
+    currentQuestion,
+    currentIndex,
+    questionLimit,
+    score,
+    correctCount,
+    finished,
+    completed,
+    empty,
+    loading,
+    submitting,
+    error,
+    lastResult,
+    selectedAnswer,
+    timeLeft,
+    submitAnswer,
+    goNextQuestion,
+    restart,
+    retry,
+  } = useGame({
+    type: "riddle",
+    language,
+    questionLimit: 10,
+    defaultTimeSeconds: 20,
+  });
 
-export function RiddlesPage({ onBack, userPoints, onPointsUpdate }: RiddlesPageProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [answerState, setAnswerState] = useState<AnswerState>("idle");
-  const [timeLeft, setTimeLeft] = useState(TIMER_TOTAL);
-  const [sessionPoints, setSessionPoints] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [showResult, setShowResult] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [answer, setAnswer] = useState("");
 
-  const riddle = RIDDLES[currentIndex];
-  const isAnswered = answerState !== "idle";
-  const isLast = currentIndex === RIDDLES.length - 1;
+  const isAnswered = Boolean(lastResult);
+  const timedOut = selectedAnswer === "__TIMEOUT__";
 
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
+  const timeLimit =
+    Number(currentQuestion?.time_limit) > 0
+      ? Number(currentQuestion?.time_limit)
+      : 20;
 
-  const handleTimeout = useCallback(() => {
-    stopTimer();
-    setTimedOut(true);
-    setAnswerState("wrong");
-  }, [stopTimer]);
+  const timerPercent = Math.max(
+    0,
+    Math.min((timeLeft / timeLimit) * 100, 100),
+  );
 
-  useEffect(() => {
-    if (isAnswered) return;
-    setTimeLeft(TIMER_TOTAL);
-    timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          handleTimeout();
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-    return () => stopTimer();
-  }, [currentIndex, isAnswered, handleTimeout, stopTimer]);
+  const timerColor =
+    timeLeft > timeLimit * 0.6
+      ? "#22D3EE"
+      : timeLeft > timeLimit * 0.3
+        ? "#FBBF24"
+        : "#F87171";
 
-  const handleAnswer = (index: number) => {
-    if (isAnswered) return;
-    stopTimer();
-    setSelectedAnswer(index);
-    const correct = index === riddle.correct;
-    setAnswerState(correct ? "correct" : "wrong");
-    setTimedOut(false);
-    if (correct) {
-      setSessionPoints((p) => p + riddle.points);
-      setCorrectCount((c) => c + 1);
-      onPointsUpdate(userPoints + riddle.points);
-    }
-  };
+  const handleSubmit = async () => {
+    const value = answer.trim();
 
-  const handleNext = () => {
-    if (isLast) {
-      setShowResult(true);
+    if (!value || isAnswered || submitting || loading) {
       return;
     }
-    setCurrentIndex((i) => i + 1);
-    setSelectedAnswer(null);
-    setAnswerState("idle");
-    setTimedOut(false);
-    setTimeLeft(TIMER_TOTAL);
+
+    await submitAnswer(value);
   };
 
-  const handleRestart = () => {
-    setCurrentIndex(0);
-    setSelectedAnswer(null);
-    setAnswerState("idle");
-    setTimedOut(false);
-    setTimeLeft(TIMER_TOTAL);
-    setSessionPoints(0);
-    setCorrectCount(0);
-    setShowResult(false);
+  const handleNext = async () => {
+    if (lastResult?.user?.points != null) {
+      onPointsUpdate(Number(lastResult.user.points));
+    }
+
+    setAnswer("");
+    await goNextQuestion();
   };
 
-  const timerPct = (timeLeft / TIMER_TOTAL) * 100;
-  const timerColor =
-    timeLeft > 12 ? "#10B981" : timeLeft > 6 ? "#FBBF24" : "#EF4444";
+  const handleRestart = async () => {
+    setAnswer("");
+    await restart();
+  };
 
-  if (showResult) {
-    return <ResultScreen
-      correct={correctCount}
-      total={RIDDLES.length}
-      points={sessionPoints}
-      onRestart={handleRestart}
-      onBack={onBack}
-    />;
+  if (loading && !currentQuestion) {
+    return (
+      <StatusCard
+        emoji="🧩"
+        title="Loading riddles..."
+        message="Preparing your next riddle."
+      />
+    );
+  }
+
+  if (error && !currentQuestion) {
+    return (
+      <StatusCard
+        emoji="⚠️"
+        title="Unable to load riddles"
+        message={error.message}
+        actionLabel="TRY AGAIN"
+        onAction={() => void retry()}
+        onBack={onBack}
+      />
+    );
+  }
+
+  if (finished || completed || empty) {
+    if (empty && currentIndex === 0) {
+      return (
+        <StatusCard
+          emoji="📭"
+          title="No riddles available"
+          message="There are no active riddles for this language right now."
+          actionLabel="BACK TO HOME"
+          onAction={onBack}
+        />
+      );
+    }
+
+    return (
+      <ResultScreen
+        correct={correctCount}
+        total={Math.max(currentIndex + (lastResult ? 1 : 0), 1)}
+        points={score}
+        onRestart={() => void handleRestart()}
+        onBack={onBack}
+      />
+    );
+  }
+
+  if (!currentQuestion) {
+    return null;
   }
 
   return (
     <div className="flex flex-col gap-4 pb-2">
-      {/* Top bar */}
       <div className="flex items-center justify-between">
         <motion.button
+          type="button"
           whileTap={{ scale: 0.92 }}
           onClick={onBack}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
+          className="flex items-center gap-1.5 rounded-xl px-3 py-2"
           style={{
-            background: "rgba(109,40,217,0.15)",
-            border: "1px solid rgba(109,40,217,0.3)",
+            background: "rgba(124,58,237,0.12)",
+            border: "1px solid rgba(124,58,237,0.35)",
             color: "#A78BFA",
-            cursor: "pointer",
           }}
         >
           <ArrowLeft size={15} />
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: "0.82rem" }}>Back</span>
+          <span
+            style={{
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 600,
+              fontSize: "0.82rem",
+            }}
+          >
+            Back
+          </span>
         </motion.button>
 
-        {/* Session score */}
-        <div
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
-          style={{
-            background: "rgba(251,191,36,0.12)",
-            border: "1px solid rgba(251,191,36,0.3)",
-          }}
-        >
-          <Star size={13} style={{ color: "#FBBF24" }} />
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "0.82rem", color: "#FBBF24" }}>
-            +{sessionPoints} pts
-          </span>
+        <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5"
+            style={{
+              background: "rgba(251,191,36,0.1)",
+              border: "1px solid rgba(251,191,36,0.25)",
+            }}
+          >
+            <Star size={12} style={{ color: "#FBBF24" }} />
+            <span
+              style={{
+                fontFamily: "'Rajdhani', sans-serif",
+                fontWeight: 700,
+                fontSize: "0.78rem",
+                color: "#FBBF24",
+              }}
+            >
+              +{score}
+            </span>
+          </div>
+
+          <div
+            className="rounded-xl px-2.5 py-1.5"
+            style={{
+              background: "rgba(124,58,237,0.12)",
+              border: "1px solid rgba(124,58,237,0.3)",
+              color: "#C4B5FD",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 700,
+              fontSize: "0.78rem",
+            }}
+          >
+            {userPoints.toLocaleString()} XP
+          </div>
         </div>
       </div>
 
-      {/* Progress + question counter */}
-      <div>
-        <div className="flex justify-between mb-1.5">
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: "0.72rem", color: "#9CA3AF" }}>
-            Question {currentIndex + 1} of {RIDDLES.length}
-          </span>
+      <div
+        className="rounded-2xl px-4 py-3"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(15,28,58,0.92))",
+          border: "1px solid rgba(124,58,237,0.4)",
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Brain size={16} style={{ color: "#A78BFA" }} />
+            <span
+              style={{
+                fontFamily: "'Rajdhani', sans-serif",
+                fontWeight: 700,
+                fontSize: "0.9rem",
+                color: "#F5F3FF",
+              }}
+            >
+              RIDDLES
+            </span>
+          </div>
+
           <span
             style={{
               fontFamily: "'Rajdhani', sans-serif",
               fontWeight: 700,
-              fontSize: "0.7rem",
-              color: DIFFICULTY_COLORS[riddle.difficulty],
-              letterSpacing: "0.08em",
+              fontSize: "0.68rem",
+              color: "#A78BFA",
             }}
           >
-            {riddle.difficulty}
+            Q{currentIndex + 1}/{questionLimit}
           </span>
-        </div>
-        <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <motion.div
-            className="h-full rounded-full"
-            animate={{ width: `${((currentIndex + 1) / RIDDLES.length) * 100}%` }}
-            transition={{ duration: 0.4 }}
-            style={{ background: "linear-gradient(90deg, #6D28D9, #A78BFA)" }}
-          />
         </div>
       </div>
 
-      {/* Timer */}
       <motion.div
-        className="flex flex-col items-center gap-1.5 py-3 rounded-2xl relative overflow-hidden"
         animate={{
-          borderColor: `${timerColor}55`,
-          boxShadow: `0 0 20px ${timerColor}22`,
+          borderColor: `${timerColor}66`,
+          boxShadow: `0 0 18px ${timerColor}18`,
         }}
+        className="flex items-center gap-3 rounded-2xl px-4 py-3"
         style={{
-          background: "#1F2937",
-          border: `1.5px solid ${timerColor}55`,
+          background: "#0F1C3A",
+          border: `1.5px solid ${timerColor}66`,
         }}
       >
-        <div className="flex items-center gap-2">
-          <Clock size={14} style={{ color: timerColor }} />
-          <motion.span
-            key={timeLeft}
-            initial={{ scale: 1.2, opacity: 0.7 }}
-            animate={{ scale: 1, opacity: 1 }}
-            style={{
-              fontFamily: "'Rajdhani', sans-serif",
-              fontWeight: 800,
-              fontSize: "1.5rem",
-              color: timerColor,
-              minWidth: 32,
-              textAlign: "center",
-            }}
-          >
-            {timeLeft}s
-          </motion.span>
-        </div>
-        {/* Timer bar */}
-        <div className="w-4/5 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
+        <Clock size={15} style={{ color: timerColor }} />
+
+        <div
+          className="h-1.5 flex-1 rounded-full"
+          style={{ background: "rgba(255,255,255,0.07)" }}
+        >
           <motion.div
-            className="h-full rounded-full"
-            animate={{ width: `${timerPct}%` }}
+            animate={{ width: `${timerPercent}%` }}
             transition={{ duration: 0.9, ease: "linear" }}
-            style={{ background: timerColor }}
+            className="h-full rounded-full"
+            style={{
+              background: timerColor,
+              boxShadow: `0 0 8px ${timerColor}88`,
+            }}
           />
         </div>
 
-        {/* Points reward chip */}
-        <div
-          className="absolute top-2 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full"
-          style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)" }}
-        >
-          <Zap size={11} style={{ color: "#FBBF24" }} />
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "0.68rem", color: "#FBBF24" }}>
-            +{riddle.points}
-          </span>
-        </div>
-      </motion.div>
-
-      {/* Question card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={riddle.id}
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -24 }}
-          transition={{ duration: 0.28 }}
-          className="rounded-2xl px-5 py-5"
+        <span
           style={{
-            background: "linear-gradient(145deg, #263248, #1F2937)",
-            border: "1px solid rgba(109,40,217,0.25)",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 800,
+            fontSize: "1.15rem",
+            color: timerColor,
+            minWidth: 30,
+            textAlign: "right",
           }}
         >
-          <div className="flex items-start gap-2 mb-1">
-            <span style={{ fontSize: "1.3rem" }}>🧩</span>
-            <p
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: "0.97rem",
-                color: "#F9FAFB",
-                lineHeight: 1.6,
-                margin: 0,
-              }}
-            >
-              {riddle.question}
-            </p>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+          {timeLeft}s
+        </span>
+      </motion.div>
 
-      {/* Answer buttons */}
       <AnimatePresence mode="wait">
         <motion.div
-          key={riddle.id + "-answers"}
-          className="flex flex-col gap-2.5"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          key={currentQuestion.id}
+          initial={{ opacity: 0, x: 28 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -28 }}
+          className="rounded-2xl px-5 py-5"
+          style={{
+            background:
+              "linear-gradient(145deg, #0F1C3A 0%, #1A1040 100%)",
+            border: "1.5px solid rgba(124,58,237,0.28)",
+            boxShadow:
+              "0 0 28px rgba(124,58,237,0.10), inset 0 1px 0 rgba(255,255,255,0.04)",
+          }}
         >
-          {riddle.answers.map((answer, i) => {
-            const isSelected = selectedAnswer === i;
-            const isCorrectAnswer = i === riddle.correct;
-            const showCorrect = isAnswered && isCorrectAnswer;
-            const showWrong = isAnswered && isSelected && !isCorrectAnswer;
-
-            let bg = "#1F2937";
-            let border = "rgba(109,40,217,0.18)";
-            let textColor = "#D1D5DB";
-            let iconEl: React.ReactNode = null;
-            let glowColor = "transparent";
-
-            if (showCorrect) {
-              bg = "rgba(16,185,129,0.15)";
-              border = "#10B981";
-              textColor = "#6EE7B7";
-              glowColor = "rgba(16,185,129,0.25)";
-              iconEl = <CheckCircle2 size={16} style={{ color: "#10B981", flexShrink: 0 }} />;
-            } else if (showWrong) {
-              bg = "rgba(239,68,68,0.15)";
-              border = "#EF4444";
-              textColor = "#FCA5A5";
-              glowColor = "rgba(239,68,68,0.2)";
-              iconEl = <XCircle size={16} style={{ color: "#EF4444", flexShrink: 0 }} />;
-            } else if (isAnswered && !isSelected) {
-              bg = "#1a2233";
-              border = "rgba(255,255,255,0.05)";
-              textColor = "#4B5563";
-            }
-
-            return (
-              <motion.button
-                key={i}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06 }}
-                whileTap={!isAnswered ? { scale: 0.97 } : {}}
-                onClick={() => handleAnswer(i)}
-                disabled={isAnswered}
-                className="flex items-center gap-3 px-4 py-3.5 rounded-xl w-full text-left"
-                style={{
-                  background: bg,
-                  border: `1.5px solid ${border}`,
-                  boxShadow: showCorrect || showWrong ? `0 0 16px ${glowColor}` : "none",
-                  cursor: isAnswered ? "default" : "pointer",
-                  transition: "all 0.25s ease",
-                }}
-              >
-                {/* Letter badge */}
-                <div
-                  className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center"
-                  style={{
-                    background: showCorrect
-                      ? "#10B98122"
-                      : showWrong
-                      ? "#EF444422"
-                      : "rgba(109,40,217,0.2)",
-                    border: showCorrect
-                      ? "1px solid #10B98155"
-                      : showWrong
-                      ? "1px solid #EF444455"
-                      : "1px solid rgba(109,40,217,0.3)",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "'Rajdhani', sans-serif",
-                      fontWeight: 700,
-                      fontSize: "0.75rem",
-                      color: showCorrect ? "#10B981" : showWrong ? "#EF4444" : "#A78BFA",
-                    }}
-                  >
-                    {["A", "B", "C", "D"][i]}
-                  </span>
-                </div>
-                <span
-                  style={{
-                    flex: 1,
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: "0.88rem",
-                    color: textColor,
-                    transition: "color 0.2s",
-                  }}
-                >
-                  {answer}
-                </span>
-                {iconEl}
-              </motion.button>
-            );
-          })}
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "1rem",
+              color: "#F5F3FF",
+              lineHeight: 1.7,
+              margin: 0,
+            }}
+          >
+            {String(currentQuestion.question ?? "")}
+          </p>
         </motion.div>
       </AnimatePresence>
 
-      {/* Timeout message */}
-      <AnimatePresence>
-        {timedOut && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex items-center justify-center gap-2 py-2 rounded-xl"
-            style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}
-          >
-            <Clock size={14} style={{ color: "#EF4444" }} />
-            <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: "0.82rem", color: "#FCA5A5" }}>
-              Time's up! The correct answer was highlighted.
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div
+        className="rounded-2xl p-4"
+        style={{
+          background: "rgba(15,28,58,0.78)",
+          border: `1.5px solid ${
+            lastResult?.is_correct
+              ? "#10B981"
+              : isAnswered
+                ? "#F87171"
+                : "rgba(124,58,237,0.28)"
+          }`,
+        }}
+      >
+        <label
+          htmlFor="riddle-answer"
+          style={{
+            display: "block",
+            marginBottom: 8,
+            color: "#C4B5FD",
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 700,
+            fontSize: "0.8rem",
+          }}
+        >
+          YOUR ANSWER
+        </label>
 
-      {/* Feedback + Next button */}
-      <AnimatePresence>
-        {isAnswered && (
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col gap-2"
+        <input
+          id="riddle-answer"
+          type="text"
+          value={answer}
+          onChange={(event) => setAnswer(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              void handleSubmit();
+            }
+          }}
+          disabled={isAnswered || submitting}
+          placeholder="Type your answer here..."
+          className="w-full rounded-xl px-4 py-3 outline-none"
+          style={{
+            background: "rgba(17,24,39,0.9)",
+            border: "1px solid rgba(124,58,237,0.25)",
+            color: "#F9FAFB",
+          }}
+        />
+
+        {!isAnswered && (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => void handleSubmit()}
+            disabled={!answer.trim() || submitting}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-3"
+            style={{
+              background:
+                answer.trim() && !submitting
+                  ? "linear-gradient(135deg, #6D28D9, #4C1D95)"
+                  : "rgba(107,114,128,0.25)",
+              color: "#FFFFFF",
+              cursor:
+                answer.trim() && !submitting
+                  ? "pointer"
+                  : "not-allowed",
+              opacity: answer.trim() && !submitting ? 1 : 0.6,
+            }}
           >
-            {/* Feedback pill */}
-            {!timedOut && (
-              <div
-                className="flex items-center justify-center gap-2 py-2 rounded-xl"
-                style={{
-                  background: answerState === "correct" ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
-                  border: `1px solid ${answerState === "correct" ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"}`,
-                }}
-              >
-                {answerState === "correct" ? (
-                  <>
-                    <CheckCircle2 size={14} style={{ color: "#10B981" }} />
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "0.82rem", color: "#6EE7B7" }}>
-                      Correct! +{riddle.points} points earned
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle size={14} style={{ color: "#EF4444" }} />
-                    <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: "0.82rem", color: "#FCA5A5" }}>
-                      Wrong answer — 0 points
-                    </span>
-                  </>
-                )}
-              </div>
+            <Send size={15} />
+            {submitting ? "SUBMITTING..." : "SUBMIT ANSWER"}
+          </motion.button>
+        )}
+      </div>
+
+      {timedOut && isAnswered && (
+        <div
+          className="rounded-xl px-4 py-3 text-center"
+          style={{
+            background: "rgba(248,113,113,0.1)",
+            border: "1px solid rgba(248,113,113,0.3)",
+            color: "#FCA5A5",
+          }}
+        >
+          Time&apos;s up!
+        </div>
+      )}
+
+      {error && (
+        <div
+          className="rounded-xl px-4 py-3 text-center"
+          style={{
+            background: "rgba(248,113,113,0.1)",
+            border: "1px solid rgba(248,113,113,0.3)",
+            color: "#FCA5A5",
+          }}
+        >
+          {error.message}
+        </div>
+      )}
+
+      {isAnswered && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-2.5"
+        >
+          <div
+            className="flex items-center justify-center gap-2 rounded-xl px-4 py-3"
+            style={{
+              background: lastResult?.is_correct
+                ? "rgba(16,185,129,0.1)"
+                : "rgba(248,113,113,0.1)",
+              border: `1px solid ${
+                lastResult?.is_correct
+                  ? "rgba(16,185,129,0.35)"
+                  : "rgba(248,113,113,0.35)"
+              }`,
+            }}
+          >
+            {lastResult?.is_correct ? (
+              <>
+                <CheckCircle2 size={15} style={{ color: "#10B981" }} />
+                <span style={{ color: "#6EE7B7", fontWeight: 700 }}>
+                  Correct! +{lastResult.points_earned} points
+                </span>
+              </>
+            ) : (
+              <>
+                <XCircle size={15} style={{ color: "#F87171" }} />
+                <span style={{ color: "#FCA5A5" }}>
+                  Correct answer:{" "}
+                  <strong>{lastResult?.correct_answer ?? "—"}</strong>
+                </span>
+              </>
             )}
+          </div>
 
-            {/* Next button */}
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={handleNext}
-              className="flex items-center justify-center gap-2 py-3.5 rounded-2xl w-full"
-              style={{
-                background: "linear-gradient(135deg, #6D28D9, #7C3AED)",
-                border: "1px solid rgba(167,139,250,0.3)",
-                boxShadow: "0 0 20px rgba(109,40,217,0.4)",
-                cursor: "pointer",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "'Rajdhani', sans-serif",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  color: "#fff",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {isLast ? "SEE RESULTS" : "NEXT RIDDLE"}
-              </span>
-              <ChevronRight size={16} style={{ color: "#fff" }} />
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => void handleNext()}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5"
+            style={{
+              background:
+                "linear-gradient(135deg, #6D28D9, #4C1D95)",
+              color: "#FFFFFF",
+            }}
+          >
+            {currentIndex + 1 >= questionLimit
+              ? "SEE RESULTS"
+              : "NEXT RIDDLE"}
+            <ChevronRight size={16} />
+          </motion.button>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -527,151 +491,133 @@ function ResultScreen({
   onRestart: () => void;
   onBack: () => void;
 }) {
-  const pct = Math.round((correct / total) * 100);
-  const grade =
-    pct >= 90 ? { label: "GENIUS!", emoji: "🧠", color: "#FBBF24" }
-    : pct >= 70 ? { label: "GREAT!", emoji: "🏆", color: "#10B981" }
-    : pct >= 50 ? { label: "GOOD JOB!", emoji: "⭐", color: "#8B5CF6" }
-    : { label: "KEEP TRYING!", emoji: "💪", color: "#F97316" };
+  const accuracy = Math.round(
+    (correct / Math.max(total, 1)) * 100,
+  );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center gap-5 py-4"
-    >
-      {/* Trophy graphic */}
-      <motion.div
-        initial={{ scale: 0.5, rotate: -10 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: "spring", stiffness: 200, damping: 14 }}
-        className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl"
+    <div className="flex flex-col items-center gap-5 py-4">
+      <div className="text-6xl">🧩</div>
+      <h2
         style={{
-          background: `linear-gradient(135deg, ${grade.color}33, ${grade.color}11)`,
-          border: `2px solid ${grade.color}55`,
-          boxShadow: `0 0 40px ${grade.color}33`,
+          fontFamily: "'Rajdhani', sans-serif",
+          fontWeight: 800,
+          fontSize: "1.6rem",
+          color: "#A78BFA",
+          margin: 0,
         }}
       >
-        {grade.emoji}
-      </motion.div>
+        RIDDLES RESULTS
+      </h2>
 
-      <div className="flex flex-col items-center gap-1">
-        <span
-          style={{
-            fontFamily: "'Rajdhani', sans-serif",
-            fontWeight: 800,
-            fontSize: "1.6rem",
-            color: grade.color,
-            letterSpacing: "0.04em",
-          }}
-        >
-          {grade.label}
-        </span>
-        <span style={{ color: "#9CA3AF", fontSize: "0.8rem" }}>
-          {correct} out of {total} correct
-        </span>
-      </div>
-
-      {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-3 w-full">
+      <div className="grid w-full grid-cols-3 gap-2.5">
         {[
-          { label: "Correct", value: correct, icon: "✅", color: "#10B981" },
-          { label: "Score", value: `${pct}%`, icon: "📊", color: "#A78BFA" },
-          { label: "Points", value: `+${points}`, icon: "🪙", color: "#FBBF24" },
-        ].map((s) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+          ["Correct", String(correct), "✅"],
+          ["Accuracy", `${accuracy}%`, "🎯"],
+          ["Points", `+${points}`, "⭐"],
+        ].map(([label, value, icon]) => (
+          <div
+            key={label}
             className="flex flex-col items-center rounded-2xl py-4"
             style={{
-              background: "#1F2937",
-              border: `1px solid ${s.color}33`,
-              boxShadow: `0 0 12px ${s.color}15`,
+              background: "#0F1C3A",
+              border: "1px solid rgba(124,58,237,0.2)",
             }}
           >
-            <span style={{ fontSize: "1.3rem" }}>{s.icon}</span>
-            <span
-              style={{
-                fontFamily: "'Rajdhani', sans-serif",
-                fontWeight: 800,
-                fontSize: "1.1rem",
-                color: s.color,
-              }}
-            >
-              {s.value}
+            <span>{icon}</span>
+            <strong style={{ color: "#F9FAFB" }}>{value}</strong>
+            <span style={{ color: "#9CA3AF", fontSize: "0.65rem" }}>
+              {label}
             </span>
-            <span style={{ color: "#6B7280", fontSize: "0.62rem" }}>{s.label}</span>
-          </motion.div>
+          </div>
         ))}
       </div>
 
-      {/* Trophy progress */}
-      <div
-        className="w-full rounded-2xl px-5 py-4"
-        style={{ background: "#1F2937", border: "1px solid rgba(109,40,217,0.2)" }}
+      <button
+        type="button"
+        onClick={onRestart}
+        className="w-full rounded-2xl py-3.5"
+        style={{
+          background: "linear-gradient(135deg, #6D28D9, #4C1D95)",
+          color: "#FFFFFF",
+        }}
       >
-        <div className="flex justify-between mb-2">
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: "0.75rem", color: "#9CA3AF" }}>
-            ACCURACY
-          </span>
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "0.75rem", color: grade.color }}>
-            {pct}%
-          </span>
-        </div>
-        <div className="w-full h-2.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ delay: 0.3, duration: 0.7, ease: "easeOut" }}
-            className="h-full rounded-full"
-            style={{ background: `linear-gradient(90deg, #6D28D9, ${grade.color})` }}
-          />
-        </div>
-        <div className="flex items-center gap-1.5 mt-3">
-          <Trophy size={13} style={{ color: "#FBBF24" }} />
-          <span style={{ color: "#D1D5DB", fontSize: "0.78rem" }}>
-            {points > 0 ? `${points} points added to your total!` : "Keep practicing to earn points!"}
-          </span>
-        </div>
-      </div>
+        PLAY AGAIN
+      </button>
 
-      {/* Buttons */}
-      <div className="flex flex-col gap-2.5 w-full">
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onRestart}
-          className="flex items-center justify-center gap-2 py-3.5 rounded-2xl w-full"
-          style={{
-            background: "linear-gradient(135deg, #6D28D9, #7C3AED)",
-            border: "1px solid rgba(167,139,250,0.3)",
-            boxShadow: "0 0 24px rgba(109,40,217,0.4)",
-            cursor: "pointer",
-          }}
-        >
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "1rem", color: "#fff", letterSpacing: "0.05em" }}>
-            PLAY AGAIN
-          </span>
-          <span style={{ fontSize: "0.9rem" }}>🧩</span>
-        </motion.button>
+      <button
+        type="button"
+        onClick={onBack}
+        className="w-full rounded-2xl py-3"
+        style={{
+          background: "rgba(124,58,237,0.08)",
+          border: "1px solid rgba(124,58,237,0.28)",
+          color: "#C4B5FD",
+        }}
+      >
+        BACK TO HOME
+      </button>
+    </div>
+  );
+}
 
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={onBack}
-          className="flex items-center justify-center gap-2 py-3 rounded-2xl w-full"
-          style={{
-            background: "rgba(109,40,217,0.12)",
-            border: "1px solid rgba(109,40,217,0.3)",
-            cursor: "pointer",
-          }}
-        >
-          <ArrowLeft size={15} style={{ color: "#A78BFA" }} />
-          <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 600, fontSize: "0.9rem", color: "#A78BFA", letterSpacing: "0.04em" }}>
+function StatusCard({
+  emoji,
+  title,
+  message,
+  actionLabel,
+  onAction,
+  onBack,
+}: {
+  emoji: string;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  onBack?: () => void;
+}) {
+  return (
+    <div className="flex min-h-[440px] items-center justify-center">
+      <div
+        className="w-full max-w-sm rounded-2xl px-6 py-6 text-center"
+        style={{
+          background: "#0F1C3A",
+          border: "1px solid rgba(124,58,237,0.25)",
+          color: "#F9FAFB",
+        }}
+      >
+        <div className="mb-3 text-4xl">{emoji}</div>
+        <h2>{title}</h2>
+        <p style={{ color: "#9CA3AF" }}>{message}</p>
+
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="mt-4 w-full rounded-xl py-3"
+            style={{
+              background: "linear-gradient(135deg, #6D28D9, #4C1D95)",
+              color: "#FFFFFF",
+            }}
+          >
+            {actionLabel}
+          </button>
+        )}
+
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-3 w-full rounded-xl py-3"
+            style={{
+              background: "rgba(124,58,237,0.08)",
+              color: "#C4B5FD",
+            }}
+          >
             BACK TO HOME
-          </span>
-        </motion.button>
+          </button>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 }

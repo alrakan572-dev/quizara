@@ -1,65 +1,62 @@
-import type { NormalizedQuestion } from "../types/question";
-import { fetchOpenTriviaQuestions } from "../api/openTriviaApi";
-import { normalizeOpenTriviaQuestion } from "../api/normalizeQuestion";
 import { QuestionRepository } from "../repositories/QuestionRepository";
+import { giveReward } from "./RewardService";
 
-export async function getQuestions() {
-  return await QuestionRepository.getAll();
-}
+export class QuestionService {
+  static async getQuestion(language = "en") {
+    const { data, error } =
+      await QuestionRepository.getRandomQuestion(language);
 
-export async function getRandomQuestions(limit = 10) {
-  return await QuestionRepository.getRandom(limit);
-}
+    if (error) {
+      console.error("Question Error:", error);
+      return null;
+    }
 
-export async function getQuestionById(id: number) {
-  return await QuestionRepository.getById(id);
-}
-
-export async function getQuestionsByCategory(category: string, limit = 10) {
-  return await QuestionRepository.getByCategory(category, limit);
-}
-
-export async function questionExists(question: string) {
-  const { data, error } = await QuestionRepository.getByQuestionText(question);
-
-  if (error) {
-    console.error("Question Exists Error:", error);
-    return false;
+    return data;
   }
 
-  return data.length > 0;
-}
+  static async answerQuestion(
+    telegramId: number,
+    question: any,
+    selectedAnswer: string
+  ) {
+    const correctAnswer = String(
+      question?.correct_answer ?? ""
+    ).trim();
 
-export async function saveQuestion(question: NormalizedQuestion) {
-  const exists = await questionExists(question.question);
+    const userAnswer = String(
+      selectedAnswer ?? ""
+    ).trim();
 
-  if (exists) {
-    return { data: null, error: null, skipped: true };
+    const isCorrect =
+      correctAnswer.toLowerCase() ===
+      userAnswer.toLowerCase();
+
+    const earnedPoints = isCorrect
+      ? Number(question?.points ?? 10)
+      : 0;
+
+    if (isCorrect && earnedPoints > 0) {
+      await giveReward(telegramId, {
+        type: "points",
+        value: earnedPoints,
+      });
+    }
+
+    await QuestionRepository.saveAnsweredQuestion({
+      telegram_id: telegramId,
+      question_id: question.id,
+      source: question.source ?? "manual",
+      is_correct: isCorrect,
+      points_earned: earnedPoints,
+      game_mode: "general_knowledge",
+    });
+
+    await QuestionRepository.increaseQuestionUsage(question.id);
+
+    return {
+      isCorrect,
+      earnedPoints,
+      correctAnswer,
+    };
   }
-
-  const { data, error } = await QuestionRepository.insert(question);
-
-  if (error) {
-    console.error("Save Question Error:", error);
-    console.log("Question Payload:", question);
-  }
-
-  return { data, error, skipped: false };
-}
-
-export async function saveQuestions(questions: NormalizedQuestion[]) {
-  const results = [];
-
-  for (const question of questions) {
-    const result = await saveQuestion(question);
-    results.push(result);
-  }
-
-  return results;
-}
-
-export async function importFromOpenTrivia(amount = 10) {
-  const rawQuestions = await fetchOpenTriviaQuestions(amount);
-  const normalizedQuestions = rawQuestions.map(normalizeOpenTriviaQuestion);
-  return await saveQuestions(normalizedQuestions);
 }

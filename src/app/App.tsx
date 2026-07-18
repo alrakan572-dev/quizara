@@ -1,23 +1,25 @@
-import { useUser } from "../hooks/useUser";
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Home, Trophy, User } from "lucide-react";
-import { HomePage } from "./components/HomePage";
-import { LeaderboardPage } from "./components/LeaderboardPage";
-import { ProfilePage } from "./components/ProfilePage";
-import { RiddlesPage } from "./components/RiddlesPage";
-import { GeneralKnowledgePage } from "./components/GeneralKnowledgePage";
-import { DailyChallengePage } from "./components/DailyChallengePage";
-import { FastestPage } from "./components/FastestPage";
-import { LuckyBoxPage } from "./components/LuckyBoxPage";
-import { VIPPage } from "./components/VIPPage";
-import { RewardsPage } from "./components/RewardsPage";
-import { InviteFriendsPage } from "./components/InviteFriendsPage";
-import { SettingsPage } from "./components/SettingsPage";
-import { FindDifferencePage } from "./components/FindDifferencePage";
-import { WeeklyChallengePage } from "./components/WeeklyChallengePage";
-import { EditProfilePage } from "./components/EditProfilePage";
-
+const HomePage = lazy(() => import("./components/HomePage").then((module) => ({ default: module.HomePage })));
+const LeaderboardPage = lazy(() => import("./components/LeaderboardPage").then((module) => ({ default: module.LeaderboardPage })));
+const ProfilePage = lazy(() => import("./components/ProfilePage").then((module) => ({ default: module.ProfilePage })));
+const RiddlesPage = lazy(() => import("./components/RiddlesPage").then((module) => ({ default: module.RiddlesPage })));
+const GeneralKnowledgePage = lazy(() => import("./components/GeneralKnowledgePage").then((module) => ({ default: module.GeneralKnowledgePage })));
+const DailyChallengePage = lazy(() => import("./components/DailyChallengePage").then((module) => ({ default: module.DailyChallengePage })));
+const FastestPage = lazy(() => import("./components/FastestPage").then((module) => ({ default: module.FastestPage })));
+const LuckyBoxPage = lazy(() => import("./components/LuckyBoxPage").then((module) => ({ default: module.LuckyBoxPage })));
+const VIPPage = lazy(() => import("./components/VIPPage").then((module) => ({ default: module.VIPPage })));
+const RewardsPage = lazy(() => import("./components/RewardsPage").then((module) => ({ default: module.RewardsPage })));
+const InviteFriendsPage = lazy(() => import("./components/InviteFriendsPage").then((module) => ({ default: module.InviteFriendsPage })));
+const SettingsPage = lazy(() => import("./components/SettingsPage").then((module) => ({ default: module.SettingsPage })));
+const FindDifferencePage = lazy(() => import("./components/FindDifferencePage").then((module) => ({ default: module.FindDifferencePage })));
+const WeeklyChallengePage = lazy(() => import("./components/WeeklyChallengePage").then((module) => ({ default: module.WeeklyChallengePage })));
+const EditProfilePage = lazy(() => import("./components/EditProfilePage").then((module) => ({ default: module.EditProfilePage })));
+import { useAuth } from "../auth";
+import type { AppLanguage } from "../api";
+import { useTelegramReferralClaim } from "../hooks/useTelegramReferralClaim";
+import { requestHomeRefresh } from "../home/homeRefresh";
 
 type Page = "home" | "leaderboard" | "profile" | "riddles" | "general-knowledge" | "daily-challenge" | "fastest" | "lucky-box" | "vip" | "rewards" | "invite" | "settings" | "find-difference" | "weekly-challenge" | "edit-profile";
 
@@ -30,14 +32,47 @@ const NAV_ITEMS: { id: Page; label: string; icon: typeof Home }[] = [
 const BOTTOM_NAV_PAGES: Page[] = ["home", "leaderboard", "profile"];
 
 export default function App() {
-  const { user, loading } = useUser();
+  const auth = useAuth();
+  const language: AppLanguage =
+    auth.user?.language_code?.toLowerCase().startsWith("ar")
+      ? "ar"
+      : "en";
   const [activePage, setActivePage] = useState<Page>("home");
-  const [userPoints, setUserPoints] = useState(48250);
-   if (loading) {
-    return <div>Loading...</div>;
+  const [userPoints, setUserPoints] = useState(0);
+  const pointsReady = useRef(false);
+  useTelegramReferralClaim(setUserPoints);
+
+  useEffect(() => {
+    if (auth.user) {
+      setUserPoints(auth.user.points);
+      pointsReady.current = true;
+    }
+  }, [auth.user]);
+
+  useEffect(() => {
+    if (!pointsReady.current) return;
+    requestHomeRefresh("leaderboard-updated", "user-points");
+  }, [userPoints]);
+
+  if (auth.status === "loading") {
+    return <AuthScreen emoji="🧠" title="Opening Quizora..." message="Verifying your Telegram session securely." />;
   }
 
-  console.log("Current User:", user);
+  if (auth.status === "telegram_required") {
+    return <AuthScreen emoji="✈️" title="Open Quizora in Telegram" message="Launch the Mini App from @quizor345bot to continue securely." />;
+  }
+
+  if (auth.status === "error" || !auth.user) {
+    return (
+      <AuthScreen
+        emoji="⚠️"
+        title="Unable to sign in"
+        message={auth.error ?? "Telegram authentication failed."}
+        actionLabel="TRY AGAIN"
+        onAction={() => void auth.refreshAuthentication()}
+      />
+    );
+  }
   const handleNavigate = (p: string) => setActivePage(p as Page);
 
   const showBottomNav = BOTTOM_NAV_PAGES.includes(activePage);
@@ -125,6 +160,7 @@ export default function App() {
       >
         <style>{`main::-webkit-scrollbar { display: none; }`}</style>
 
+        <Suspense fallback={<PageLoadingScreen />}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activePage}
@@ -134,7 +170,7 @@ export default function App() {
             transition={{ duration: 0.22 }}
           >
             {activePage === "home" && (
-              <HomePage onNavigate={handleNavigate} userPoints={userPoints} />
+              <HomePage onNavigate={handleNavigate} language={language} />
             )}
             {activePage === "leaderboard" && <LeaderboardPage />}
             {activePage === "profile" && <ProfilePage onNavigate={handleNavigate} />}
@@ -143,6 +179,7 @@ export default function App() {
                 onBack={() => setActivePage("home")}
                 userPoints={userPoints}
                 onPointsUpdate={setUserPoints}
+                language={language}
               />
             )}
             {activePage === "general-knowledge" && (
@@ -150,6 +187,7 @@ export default function App() {
                 onBack={() => setActivePage("home")}
                 userPoints={userPoints}
                 onPointsUpdate={setUserPoints}
+                language={language}
               />
             )}
             {activePage === "daily-challenge" && (
@@ -157,6 +195,7 @@ export default function App() {
                 onBack={() => setActivePage("home")}
                 userPoints={userPoints}
                 onPointsUpdate={setUserPoints}
+                language={language}
               />
             )}
             {activePage === "fastest" && (
@@ -164,6 +203,7 @@ export default function App() {
                 onBack={() => setActivePage("home")}
                 userPoints={userPoints}
                 onPointsUpdate={setUserPoints}
+                language={language}
               />
             )}
             {activePage === "lucky-box" && (
@@ -198,7 +238,6 @@ export default function App() {
             {activePage === "find-difference" && (
               <FindDifferencePage
                 onBack={() => setActivePage("home")}
-                userPoints={userPoints}
                 onPointsUpdate={setUserPoints}
               />
             )}
@@ -207,6 +246,7 @@ export default function App() {
                 onBack={() => setActivePage("home")}
                 userPoints={userPoints}
                 onPointsUpdate={setUserPoints}
+                language={language}
               />
             )}
             {activePage === "edit-profile" && (
@@ -217,6 +257,7 @@ export default function App() {
             )}
           </motion.div>
         </AnimatePresence>
+        </Suspense>
       </main>
 
       {/* Bottom navigation — hidden on sub-pages like riddles */}
@@ -279,6 +320,92 @@ export default function App() {
           </motion.nav>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+
+function PageLoadingScreen() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[45vh] items-center justify-center"
+      style={{ color: "#A78BFA" }}
+    >
+      <div className="text-center">
+        <div className="mb-3 text-4xl">🧠</div>
+        <div
+          style={{
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+          }}
+        >
+          LOADING...
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function AuthScreen({
+  emoji,
+  title,
+  message,
+  actionLabel,
+  onAction,
+}: {
+  emoji: string;
+  title: string;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center px-5"
+      style={{ background: "#111827" }}
+    >
+      <div
+        className="w-full max-w-sm rounded-3xl px-6 py-7 text-center"
+        style={{
+          background: "linear-gradient(145deg, #1F2937, #111827)",
+          border: "1px solid rgba(109,40,217,0.35)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+          color: "#F9FAFB",
+        }}
+      >
+        <div className="mb-3 text-5xl">{emoji}</div>
+        <h1
+          style={{
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 800,
+            fontSize: "1.45rem",
+            marginBottom: 8,
+          }}
+        >
+          {title}
+        </h1>
+        <p style={{ color: "#9CA3AF", lineHeight: 1.6 }}>
+          {message}
+        </p>
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="mt-5 w-full rounded-2xl py-3"
+            style={{
+              background: "linear-gradient(135deg, #6D28D9, #4C1D95)",
+              color: "#FFFFFF",
+              fontWeight: 700,
+            }}
+          >
+            {actionLabel}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

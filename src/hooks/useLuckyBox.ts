@@ -1,56 +1,64 @@
 import { useEffect, useState } from "react";
-import { loadLuckyBoxRewards } from "../services/LuckyBoxService";
+import { useAuth } from "../auth";
+import { loadLuckyBoxRewards, saveLuckyBoxHistory } from "../services/LuckyBoxService";
 import {
   spinLuckyBox,
   convertLuckyBoxRewardToWalletReward,
   type LuckyBoxReward,
 } from "../core/LuckyBoxEngine";
 import { giveReward } from "../services/RewardService";
-import { saveLuckyBoxHistory } from "../services/LuckyBoxService";
 import { emitGameEvent } from "../core/EventEngine";
-export function useLuckyBox(telegramId = 123456789) {
+
+export function useLuckyBox() {
+  const { user } = useAuth();
+  const telegramId = user?.telegram_id ?? null;
   const [rewards, setRewards] = useState<LuckyBoxReward[]>([]);
-  const [selectedReward, setSelectedReward] =
-    useState<LuckyBoxReward | null>(null);
+  const [selectedReward, setSelectedReward] = useState<LuckyBoxReward | null>(null);
   const [loading, setLoading] = useState(true);
   const [spinning, setSpinning] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     async function load() {
       const data = await loadLuckyBoxRewards();
-      setRewards(data);
-      setLoading(false);
+      if (active) {
+        setRewards(data);
+        setLoading(false);
+      }
     }
 
-    load();
+    void load();
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function spin() {
-    if (spinning || loading || rewards.length === 0) return null;
+    if (!telegramId || spinning || loading || rewards.length === 0) {
+      return null;
+    }
 
     setSpinning(true);
 
-    const reward = spinLuckyBox(rewards);
+    try {
+      const reward = spinLuckyBox(rewards);
+      if (!reward) return null;
 
-    if (reward) {
-   setSelectedReward(reward);
+      setSelectedReward(reward);
+      const walletReward = convertLuckyBoxRewardToWalletReward(reward);
 
-   const walletReward =
-    convertLuckyBoxRewardToWalletReward(reward);
+      await giveReward(telegramId, walletReward);
+      await saveLuckyBoxHistory(telegramId, reward);
+      await emitGameEvent({
+        type: "lucky_box_spin",
+        telegramId,
+      });
 
-   await giveReward(telegramId, walletReward);
-
-   await saveLuckyBoxHistory(
-    telegramId,
-    reward
-   );
-
-   await emitGameEvent({
-    type: "lucky_box_spin",
-    telegramId,
-  });
-}
-    return reward;
+      return reward;
+    } finally {
+      setSpinning(false);
+    }
   }
 
   return {

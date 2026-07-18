@@ -14,6 +14,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 
+import { useHomeData } from "../../hooks/useHomeData";
+import type { AppLanguage } from "../../api";
+
 const MENU_CARDS = [
   { id: 1, label: "Riddles", emoji: "🧩", icon: Puzzle, color: "#7C3AED", glow: "#6D28D9" },
   { id: 2, label: "General Knowledge", emoji: "🧠", icon: Brain, color: "#0EA5E9", glow: "#0284C7" },
@@ -24,117 +27,247 @@ const MENU_CARDS = [
   { id: 7, label: "Weekly Challenge", emoji: "🏅", icon: Medal, color: "#8B5CF6", glow: "#7C3AED" },
   { id: 8, label: "Leaderboard", emoji: "🏆", icon: Trophy, color: "#F97316", glow: "#EA580C" },
   { id: 9, label: "Profile", emoji: "👤", icon: User, color: "#6366F1", glow: "#4F46E5" },
-];
+] as const;
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
-  userPoints?: number;
+  language?: AppLanguage;
 }
 
-export function HomePage({ onNavigate, userPoints = 48250 }: HomePageProps) {
+export function HomePage({
+  onNavigate,
+  language = "en",
+}: HomePageProps) {
+  const { data, loading, error, refresh } = useHomeData({
+    language,
+  });
+
+  const user = data?.user;
+  const points = user?.points ?? 0;
+  const level = user?.level ?? 1;
+  const gamesPlayed = user?.games_played ?? 0;
+  const totalCorrect = user?.total_correct ?? 0;
+  const totalWrong = user?.total_wrong ?? 0;
+  const answered = totalCorrect + totalWrong;
+
+  const winRate =
+    answered > 0 ? Math.round((totalCorrect / answered) * 100) : 0;
+
+  const displayName =
+    user?.username || user?.first_name || "Quizora Player";
+
+  const currentRank = data?.leaderboard.current_user?.rank ?? 0;
+
+  const xpProgress = Math.min(
+    Math.max(((points % 1000) / 1000) * 100, 0),
+    100,
+  );
+
+  if (loading && !data) {
+    return (
+      <div className="flex min-h-[420px] items-center justify-center">
+        <div
+          className="rounded-2xl px-6 py-5 text-center"
+          style={{
+            background: "#1F2937",
+            border: "1px solid rgba(109,40,217,0.3)",
+            color: "#F9FAFB",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div className="mb-2 text-2xl">🎮</div>
+          <div
+            style={{
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 700,
+            }}
+          >
+            Loading Quizora...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="flex min-h-[420px] items-center justify-center">
+        <div
+          className="max-w-sm rounded-2xl px-6 py-5 text-center"
+          style={{
+            background: "#1F2937",
+            border: "1px solid rgba(239,68,68,0.35)",
+            color: "#F9FAFB",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div className="mb-2 text-2xl">⚠️</div>
+          <div className="mb-3">{error.message}</div>
+          <button
+            type="button"
+            onClick={() => {
+              void refresh();
+            }}
+            className="rounded-xl px-4 py-2"
+            style={{
+              background: "#6D28D9",
+              color: "#FFFFFF",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 700,
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5 pb-2">
-      {/* User Stats Header */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="relative rounded-2xl overflow-hidden"
+        className="relative overflow-hidden rounded-2xl"
         style={{
-          background: "linear-gradient(135deg, #2D1B69 0%, #1F2937 60%, #111827 100%)",
+          background:
+            "linear-gradient(135deg, #2D1B69 0%, #1F2937 60%, #111827 100%)",
           border: "1px solid rgba(109,40,217,0.35)",
-          boxShadow: "0 0 32px rgba(109,40,217,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+          boxShadow:
+            "0 0 32px rgba(109,40,217,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
         }}
       >
-        {/* Decorative orb */}
         <div
-          className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-30 blur-2xl"
+          className="absolute -right-8 -top-8 h-32 w-32 rounded-full opacity-30 blur-2xl"
           style={{ background: "#6D28D9" }}
         />
         <div
-          className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full opacity-20 blur-2xl"
+          className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full opacity-20 blur-2xl"
           style={{ background: "#FBBF24" }}
         />
 
-        <div className="relative p-4 flex items-center gap-3">
-          {/* Avatar */}
+        <div className="relative flex items-center gap-3 p-4">
           <div className="relative flex-shrink-0">
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl"
+              className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl text-2xl"
               style={{
                 background: "linear-gradient(135deg, #6D28D9, #4C1D95)",
                 boxShadow: "0 0 16px rgba(109,40,217,0.5)",
               }}
             >
-              🦊
+              {user?.photo_url ? (
+                <img
+                  src={user.photo_url}
+                  alt={displayName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                "🦊"
+              )}
             </div>
-            {/* Online dot */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-[#111827]" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#111827] bg-green-400" />
           </div>
 
-          {/* User info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
+          <div className="min-w-0 flex-1">
+            <div className="mb-0.5 flex items-center gap-2">
               <span
                 className="truncate"
-                style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "#F9FAFB" }}
-              >
-                Alex_Quizmaster
-              </span>
-              {/* VIP Badge */}
-              <span
-                className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs"
                 style={{
-                  background: "linear-gradient(90deg, #D97706, #FBBF24)",
-                  color: "#111827",
                   fontFamily: "'Rajdhani', sans-serif",
                   fontWeight: 700,
-                  fontSize: "0.65rem",
-                  letterSpacing: "0.08em",
-                  boxShadow: "0 0 8px rgba(251,191,36,0.4)",
+                  fontSize: "1.1rem",
+                  color: "#F9FAFB",
                 }}
               >
-                ⭐ VIP
+                {displayName}
               </span>
+
+              {user?.vip && (
+                <span
+                  className="flex-shrink-0 rounded-full px-2 py-0.5 text-xs"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, #D97706, #FBBF24)",
+                    color: "#111827",
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: 700,
+                    fontSize: "0.65rem",
+                    letterSpacing: "0.08em",
+                    boxShadow: "0 0 8px rgba(251,191,36,0.4)",
+                  }}
+                >
+                  ⭐ VIP
+                </span>
+              )}
             </div>
 
-            {/* Points row */}
-            <div className="flex items-center gap-1 mb-1">
+            <div className="mb-1 flex items-center gap-1">
               <Flame size={13} style={{ color: "#FBBF24" }} />
-              <span style={{ color: "#FBBF24", fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "1rem" }}>
-                {userPoints.toLocaleString()}
+              <span
+                style={{
+                  color: "#FBBF24",
+                  fontFamily: "'Rajdhani', sans-serif",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                }}
+              >
+                {points.toLocaleString()}
               </span>
-              <span style={{ color: "#9CA3AF", fontSize: "0.72rem", marginLeft: 2 }}>pts</span>
+              <span
+                style={{
+                  color: "#9CA3AF",
+                  fontSize: "0.72rem",
+                  marginLeft: 2,
+                }}
+              >
+                pts
+              </span>
             </div>
           </div>
 
-          {/* Ranking badge */}
           <div
-            className="flex-shrink-0 flex flex-col items-center justify-center rounded-xl px-3 py-2"
+            className="flex flex-shrink-0 flex-col items-center justify-center rounded-xl px-3 py-2"
             style={{
               background: "rgba(109,40,217,0.25)",
               border: "1px solid rgba(109,40,217,0.4)",
             }}
           >
             <ChevronUp size={12} style={{ color: "#10B981" }} />
-            <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "#F9FAFB" }}>
-              #12
+            <span
+              style={{
+                fontFamily: "'Rajdhani', sans-serif",
+                fontWeight: 700,
+                fontSize: "1.1rem",
+                color: "#F9FAFB",
+              }}
+            >
+              #{currentRank || "—"}
             </span>
-            <span style={{ color: "#9CA3AF", fontSize: "0.6rem" }}>RANK</span>
+            <span style={{ color: "#9CA3AF", fontSize: "0.6rem" }}>
+              RANK
+            </span>
           </div>
         </div>
 
-        {/* XP progress bar */}
         <div className="relative px-4 pb-4">
-          <div className="flex justify-between mb-1">
-            <span style={{ color: "#9CA3AF", fontSize: "0.68rem" }}>Level 23</span>
-            <span style={{ color: "#9CA3AF", fontSize: "0.68rem" }}>{userPoints.toLocaleString()} / 55,000 XP</span>
+          <div className="mb-1 flex justify-between">
+            <span style={{ color: "#9CA3AF", fontSize: "0.68rem" }}>
+              Level {level}
+            </span>
+            <span style={{ color: "#9CA3AF", fontSize: "0.68rem" }}>
+              {points.toLocaleString()} XP
+            </span>
           </div>
-          <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+
+          <div
+            className="h-1.5 w-full rounded-full"
+            style={{ background: "rgba(255,255,255,0.08)" }}
+          >
             <div
               className="h-full rounded-full"
               style={{
-                width: "87%",
+                width: `${xpProgress}%`,
                 background: "linear-gradient(90deg, #6D28D9, #FBBF24)",
                 boxShadow: "0 0 8px rgba(109,40,217,0.6)",
               }}
@@ -143,35 +276,54 @@ export function HomePage({ onNavigate, userPoints = 48250 }: HomePageProps) {
         </div>
       </motion.div>
 
-      {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Games", value: "342", icon: "🎮" },
-          { label: "Win Rate", value: "74%", icon: "🏆" },
-          { label: "Streak", value: "12d", icon: "🔥" },
-        ].map((stat, i) => (
+          {
+            label: "Games",
+            value: gamesPlayed.toLocaleString(),
+            icon: "🎮",
+          },
+          {
+            label: "Win Rate",
+            value: `${winRate}%`,
+            icon: "🏆",
+          },
+          {
+            label: "Coins",
+            value: (user?.coins ?? 0).toLocaleString(),
+            icon: "🪙",
+          },
+        ].map((stat, index) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.05, duration: 0.35 }}
-            className="rounded-xl flex flex-col items-center py-3"
+            transition={{ delay: 0.1 + index * 0.05, duration: 0.35 }}
+            className="flex flex-col items-center rounded-xl py-3"
             style={{
               background: "#1F2937",
               border: "1px solid rgba(109,40,217,0.18)",
               boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
             }}
           >
-            <span className="text-lg mb-0.5">{stat.icon}</span>
-            <span style={{ fontFamily: "'Rajdhani', sans-serif", fontWeight: 700, fontSize: "1.05rem", color: "#F9FAFB" }}>
+            <span className="mb-0.5 text-lg">{stat.icon}</span>
+            <span
+              style={{
+                fontFamily: "'Rajdhani', sans-serif",
+                fontWeight: 700,
+                fontSize: "1.05rem",
+                color: "#F9FAFB",
+              }}
+            >
               {stat.value}
             </span>
-            <span style={{ color: "#9CA3AF", fontSize: "0.65rem" }}>{stat.label}</span>
+            <span style={{ color: "#9CA3AF", fontSize: "0.65rem" }}>
+              {stat.label}
+            </span>
           </motion.div>
         ))}
       </div>
 
-      {/* Section title */}
       <div className="flex items-center justify-between">
         <h2
           style={{
@@ -188,10 +340,14 @@ export function HomePage({ onNavigate, userPoints = 48250 }: HomePageProps) {
         <Star size={14} style={{ color: "#FBBF24" }} />
       </div>
 
-      {/* 9-card grid */}
       <div className="grid grid-cols-3 gap-3">
-        {MENU_CARDS.map((card, i) => (
-          <GameCard key={card.id} card={card} index={i} onNavigate={onNavigate} />
+        {MENU_CARDS.map((card, index) => (
+          <GameCard
+            key={card.id}
+            card={card}
+            index={index}
+            onNavigate={onNavigate}
+          />
         ))}
       </div>
     </div>
@@ -203,7 +359,7 @@ function GameCard({
   index,
   onNavigate,
 }: {
-  card: (typeof MENU_CARDS)[0];
+  card: (typeof MENU_CARDS)[number];
   index: number;
   onNavigate: (page: string) => void;
 }) {
@@ -223,22 +379,28 @@ function GameCard({
 
   return (
     <motion.button
+      type="button"
       initial={{ opacity: 0, scale: 0.88 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.15 + index * 0.04, duration: 0.3, type: "spring", stiffness: 200 }}
+      transition={{
+        delay: 0.15 + index * 0.04,
+        duration: 0.3,
+        type: "spring",
+        stiffness: 200,
+      }}
       whileTap={{ scale: 0.93 }}
       onClick={handleClick}
-      className="flex flex-col items-center justify-center rounded-2xl py-4 px-2 gap-2 cursor-pointer w-full"
+      className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl px-2 py-4"
       style={{
-        background: `linear-gradient(145deg, #1F2937, #263248)`,
+        background: "linear-gradient(145deg, #1F2937, #263248)",
         border: `1px solid rgba(${hexToRgb(card.color)}, 0.22)`,
-        boxShadow: `0 4px 16px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.03) inset`,
+        boxShadow:
+          "0 4px 16px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.03) inset",
         transition: "box-shadow 0.2s, border-color 0.2s",
       }}
     >
-      {/* Icon circle */}
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center"
+        className="flex h-11 w-11 items-center justify-center rounded-xl"
         style={{
           background: `linear-gradient(135deg, ${card.color}22, ${card.color}44)`,
           border: `1px solid ${card.color}55`,
@@ -248,10 +410,10 @@ function GameCard({
         <Icon size={20} style={{ color: card.color }} strokeWidth={2} />
       </div>
 
-      {/* Emoji */}
-      <span style={{ fontSize: "1.15rem", lineHeight: 1 }}>{card.emoji}</span>
+      <span style={{ fontSize: "1.15rem", lineHeight: 1 }}>
+        {card.emoji}
+      </span>
 
-      {/* Label */}
       <span
         style={{
           fontFamily: "'Rajdhani', sans-serif",
@@ -271,7 +433,11 @@ function GameCard({
 
 function hexToRgb(hex: string): string {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+
   return result
-    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
+    ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(
+        result[3],
+        16,
+      )}`
     : "109, 40, 217";
 }

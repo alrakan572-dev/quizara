@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  ArrowLeft, Gift, Star, Crown, Zap, Flame, Trophy,
-  Lock, Check, ChevronRight, Coins, Target, Clock,
+  ArrowLeft, Gift, Star, Crown, Zap, Trophy,
+  Lock, ChevronRight, Clock,
   Sparkles, Calendar, TrendingUp,
 } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -266,7 +266,7 @@ interface Props { onBack: () => void; userPoints: number; }
 /* ═══════════════════════════════════════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════════════════════════════════════ */
-export function RewardsPage({ onBack, userPoints }: Props) {
+export function RewardsPage({ onBack }: Props) {
   const [activeCat, setActiveCat] = useState("all");
   const [claimedIds, setClaimedIds] = useState<Set<string>>(new Set());
 

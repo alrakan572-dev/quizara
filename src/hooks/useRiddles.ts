@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../auth";
 import { RiddlesEngine } from "../core/RiddlesEngine";
 
-export function useRiddles(
-  telegramId = 123456789,
-  language = "en"
-) {
+export function useRiddles(language = "en") {
+  const { user } = useAuth();
+  const telegramId = user?.telegram_id ?? null;
   const [riddle, setRiddle] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [answering, setAnswering] = useState(false);
@@ -21,24 +21,26 @@ export function useRiddles(
   }
 
   useEffect(() => {
-    loadRiddle();
+    void loadRiddle();
   }, [language]);
 
   async function submitAnswer(answer: string) {
-    if (!riddle || answering) return null;
+    if (!telegramId || !riddle || answering) return null;
 
     setAnswering(true);
 
-    const answerResult = await RiddlesEngine.submitAnswer(
-      telegramId,
-      riddle,
-      answer
-    );
+    try {
+      const answerResult = await RiddlesEngine.submitAnswer(
+        telegramId,
+        riddle,
+        answer,
+      );
 
-    setResult(answerResult);
-    setAnswering(false);
-
-    return answerResult;
+      setResult(answerResult);
+      return answerResult;
+    } finally {
+      setAnswering(false);
+    }
   }
 
   return {
