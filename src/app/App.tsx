@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Home, Trophy, User } from "lucide-react";
+const AdminPage = lazy(() => import("../admin/AdminPage").then((module) => ({ default: module.AdminPage })));
 const HomePage = lazy(() => import("./components/HomePage").then((module) => ({ default: module.HomePage })));
 const LeaderboardPage = lazy(() => import("./components/LeaderboardPage").then((module) => ({ default: module.LeaderboardPage })));
 const ProfilePage = lazy(() => import("./components/ProfilePage").then((module) => ({ default: module.ProfilePage })));
@@ -73,6 +74,16 @@ export default function App() {
       />
     );
   }
+  const adminMode = new URLSearchParams(window.location.search).get("admin") === "1";
+
+  if (adminMode) {
+    return (
+      <Suspense fallback={<PageLoadingScreen />}>
+        <AdminPage onExit={() => { window.location.href = window.location.pathname; }} />
+      </Suspense>
+    );
+  }
+
   const handleNavigate = (p: string) => setActivePage(p as Page);
 
   const showBottomNav = BOTTOM_NAV_PAGES.includes(activePage);
@@ -223,6 +234,7 @@ export default function App() {
               <RewardsPage
                 onBack={() => setActivePage("profile")}
                 userPoints={userPoints}
+                onPointsUpdate={setUserPoints}
               />
             )}
             {activePage === "invite" && (

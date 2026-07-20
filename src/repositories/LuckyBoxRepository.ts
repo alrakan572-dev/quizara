@@ -23,7 +23,7 @@ export const LuckyBoxRepository = {
     reward_id: number;
   }) {
     return await supabase
-      .from("user_luckybox_history")
+      .from("users_luckybox_history")
       .insert(data);
   },
 };

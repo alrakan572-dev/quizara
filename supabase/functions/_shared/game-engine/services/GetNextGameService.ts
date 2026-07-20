@@ -26,7 +26,17 @@ function sanitizeContent(type: GameType, item: any) {
   delete safeItem.answer;
 
   if (type === "find_difference") {
-    delete safeItem.differences_data;
+    const rawDifferences = Array.isArray(item?.differences_data)
+      ? item.differences_data
+      : [];
+
+    safeItem.differences_data = rawDifferences.map((point: any, index: number) => ({
+      id: Number(point?.id ?? index + 1),
+      x: Number(point?.x),
+      y: Number(point?.y),
+      radius: Number(point?.radius),
+      ...(typeof point?.label === "string" ? { label: point.label } : {}),
+    }));
   }
 
   return safeItem;

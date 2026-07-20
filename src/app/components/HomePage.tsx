@@ -9,9 +9,9 @@ import {
   Medal,
   Trophy,
   User,
-  Star,
   Flame,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 
 import { useHomeData } from "../../hooks/useHomeData";
@@ -38,17 +38,23 @@ export function HomePage({
   onNavigate,
   language = "en",
 }: HomePageProps) {
-  const { data, loading, error, refresh } = useHomeData({
+  const { data, loading, refreshing, error, refresh } = useHomeData({
     language,
   });
 
   const user = data?.user;
   const points = user?.points ?? 0;
   const level = user?.level ?? 1;
-  const gamesPlayed = user?.games_played ?? 0;
   const totalCorrect = user?.total_correct ?? 0;
   const totalWrong = user?.total_wrong ?? 0;
   const answered = totalCorrect + totalWrong;
+  const lives = user?.lives ?? 3;
+  const streak = user?.streak ?? 0;
+  const dailyCompleted = data?.challenges.daily.filter((item) => item.completed).length ?? 0;
+  const dailyTotal = data?.challenges.daily.length ?? 0;
+  const weeklyCompleted = data?.challenges.weekly.filter((item) => item.completed).length ?? 0;
+  const weeklyTotal = data?.challenges.weekly.length ?? 0;
+  const luckyRemaining = data?.lucky_box.remaining_today ?? 0;
 
   const winRate =
     answered > 0 ? Math.round((totalCorrect / answered) * 100) : 0;
@@ -279,19 +285,19 @@ export function HomePage({
       <div className="grid grid-cols-3 gap-3">
         {[
           {
-            label: "Games",
-            value: gamesPlayed.toLocaleString(),
-            icon: "🎮",
+            label: "Lives",
+            value: lives.toLocaleString(),
+            icon: "❤️",
+          },
+          {
+            label: "Streak",
+            value: streak.toLocaleString(),
+            icon: "🔥",
           },
           {
             label: "Win Rate",
             value: `${winRate}%`,
             icon: "🏆",
-          },
-          {
-            label: "Coins",
-            value: (user?.coins ?? 0).toLocaleString(),
-            icon: "🪙",
           },
         ].map((stat, index) => (
           <motion.div
@@ -324,6 +330,34 @@ export function HomePage({
         ))}
       </div>
 
+      <div
+        className="grid grid-cols-3 gap-2 rounded-2xl p-3"
+        style={{
+          background: "rgba(31,41,55,0.85)",
+          border: "1px solid rgba(109,40,217,0.2)",
+        }}
+      >
+        <HomeStatus label="Daily" value={`${dailyCompleted}/${dailyTotal}`} />
+        <HomeStatus label="Weekly" value={`${weeklyCompleted}/${weeklyTotal}`} />
+        <HomeStatus label="Lucky" value={luckyRemaining.toLocaleString()} />
+      </div>
+
+      {error && data && (
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm"
+          style={{
+            background: "rgba(239,68,68,0.12)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            color: "#FCA5A5",
+          }}
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          Home data may be outdated — retry
+        </button>
+      )}
+
       <div className="flex items-center justify-between">
         <h2
           style={{
@@ -337,7 +371,16 @@ export function HomePage({
         >
           GAME MODES
         </h2>
-        <Star size={14} style={{ color: "#FBBF24" }} />
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          aria-label="Refresh home data"
+          className="rounded-lg p-1.5 disabled:opacity-50"
+          style={{ color: "#FBBF24" }}
+        >
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -350,6 +393,24 @@ export function HomePage({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function HomeStatus({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-center">
+      <div
+        style={{
+          color: "#F9FAFB",
+          fontFamily: "'Rajdhani', sans-serif",
+          fontWeight: 700,
+          fontSize: "0.95rem",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ color: "#9CA3AF", fontSize: "0.62rem" }}>{label}</div>
     </div>
   );
 }

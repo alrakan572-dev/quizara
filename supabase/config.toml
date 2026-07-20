@@ -174,3 +174,27 @@ entrypoint = "./functions/get-profile/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/get-profile/*.html" ]
+
+[functions.admin-dashboard]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-dashboard/deno.json"
+entrypoint = "./functions/admin-dashboard/index.ts"
+
+[functions.admin-update-settings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-update-settings/deno.json"
+entrypoint = "./functions/admin-update-settings/index.ts"
+
+[functions.get-rewards-data]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-rewards-data/deno.json"
+entrypoint = "./functions/get-rewards-data/index.ts"
+
+[functions.claim-achievement-reward]
+enabled = true
+verify_jwt = false
+import_map = "./functions/claim-achievement-reward/deno.json"
+entrypoint = "./functions/claim-achievement-reward/index.ts"

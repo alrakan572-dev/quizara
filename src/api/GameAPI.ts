@@ -1,5 +1,5 @@
 import { SessionStorage } from "../auth";
-import type { ApiResponse, AppLanguage, HomeData, HomeChallenge, LeaderboardEntry, VipStatus } from "./types";
+import type { ApiResponse, AppLanguage, HomeData, HomeChallenge, LeaderboardEntry, VipStatus, VipPlansData } from "./types";
 
 export type GameType = "quiz" | "riddle" | "fastest" | "find_difference";
 export interface GameItem { id: number; question?: string | null; option_a?: string | null; option_b?: string | null; option_c?: string | null; option_d?: string | null; difficulty?: string | null; points?: number | null; category?: string | null; language?: string | null; time_limit?: number | null; image_1_url?: string | null; image_2_url?: string | null; differences_count?: number | null; differences_data?: unknown; [key: string]: unknown; }
@@ -9,6 +9,11 @@ export interface LeaderboardData { scope: string; leaders: LeaderboardEntry[]; c
 export interface ActiveChallengesData { user_id: number; language: AppLanguage; daily: HomeChallenge[]; weekly: HomeChallenge[]; }
 export interface AdAttemptData { attempt_id: string; ymid: string; provider: "monetag"; zone_id: number; request_var: "lucky_box"; status: "pending" | "valued" | "non_valued" | "consumed" | "expired"; expires_at: string; }
 export interface AdAttemptStatusData { attempt_id: string; status: "pending" | "valued" | "non_valued" | "consumed" | "expired"; verified: boolean; consumed: boolean; expires_at: string; }
+
+export interface AchievementItem { id: number; code: string; category: string; name: string; description: string; emoji: string; rarity: "Common" | "Rare" | "Epic" | "Legendary"; reward_points: number; metric: string; target: number; sort_order: number; progress: number; unlocked: boolean; claimed: boolean; unlocked_at: string | null; claimed_at: string | null; }
+export interface RewardLedgerItem { id: number; source_type: string; source_id: string; points: number; metadata: Record<string, unknown>; created_at: string; }
+export interface RewardsData { user: { points: number }; summary: { total_claimed_points: number; available_points: number; unlocked_count: number; total_count: number }; achievements: AchievementItem[]; recent_rewards: RewardLedgerItem[]; }
+export interface ClaimAchievementData { already_claimed: boolean; points_awarded: number; points_after: number; }
 export interface LuckyBoxOpenData { ad_attempt_id: string; reward: { id: number; type: string; value: number; probability?: number; }; points_after: number; hints_after: number; extra_spins_after: number; vip: boolean; vip_expire_date?: string | null; daily_limit: number; opened_today: number; opened_at: string; }
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -63,4 +68,7 @@ export const GameAPI = {
   getAdAttemptStatus: (attemptId: string) => invokeFunction<AdAttemptStatusData>("get-ad-reward-status", { attempt_id: attemptId }),
   openLuckyBox: (adAttemptId: string) => invokeFunction<LuckyBoxOpenData>("open-lucky-box", { ad_attempt_id: adAttemptId }),
   getVipStatus: () => invokeFunction<VipStatus>("get-vip-status", {}),
+  getVipPlans: (options?: { signal?: AbortSignal }) => invokeFunction<VipPlansData>("get-vip-plans", {}, options),
+  getRewardsData: (options?: { signal?: AbortSignal }) => invokeFunction<RewardsData>("get-rewards-data", {}, options),
+  claimAchievementReward: (achievementCode: string) => invokeFunction<ClaimAchievementData>("claim-achievement-reward", { achievement_code: achievementCode }),
 };

@@ -89,7 +89,6 @@ Replace old fixed values with:
 dashboard?.points
 dashboard?.level
 dashboard?.streak
-dashboard?.lives
 dashboard?.vipActive
 dashboard?.leaderboardRank
 dashboard?.totalPlayers

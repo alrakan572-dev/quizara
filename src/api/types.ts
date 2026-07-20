@@ -8,7 +8,7 @@ export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;
 export interface HomeUser {
   id: number; telegram_id: number; username: string | null; first_name: string | null; photo_url: string | null;
   points: number; coins: number; hints: number; extra_spins: number; level: number;
-  games_played: number; total_correct: number; total_wrong: number; vip: boolean;
+  games_played: number; total_correct: number; total_wrong: number; lives: number; streak: number; vip: boolean;
   last_login: string | null; created_at: string | null;
 }
 
@@ -20,7 +20,8 @@ export interface HomeChallenge {
 }
 
 export interface VipSubscription { id?: number; plan_id?: number | null; source?: string | null; start_date?: string | null; expire_date?: string | null; active?: boolean; remaining_seconds?: number; remaining_days?: number; }
-export interface VipPlan { id: number; name: string; duration_days: number; price: number; unlimited_games: boolean; ads_enabled: boolean; lucky_boxes_per_day: number; bonus_points_percent: number; vip_badge: boolean; }
+export interface VipPlan { id: number; name: string; duration_days: number; price: number; unlimited_games: boolean; ads_enabled: boolean; lucky_boxes_per_day: number; bonus_points_percent: number; vip_badge: boolean; description?: string | null; }
+export interface VipPlansData { plans: VipPlan[]; }
 export interface VipStatus { vip: boolean; subscription: VipSubscription | null; plan: VipPlan | null; benefits?: { unlimited_games: boolean; ads_enabled: boolean; lucky_boxes_per_day: number; bonus_points_percent: number; vip_badge: boolean; }; }
 export interface LeaderboardEntry { rank: number; telegram_id: number; username: string | null; total_points: number; level: number; vip: boolean; photo_url: string | null; }
 
